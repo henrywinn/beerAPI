@@ -22,6 +22,15 @@ class UserAPI(restful.Resource):
 
     def post(self):
     	args = self.reqparse.parse_args()
+    	# TODO: Check that email is valid. Send email and validate
+    	response = db.put('users', args['email'], {
+    		"name": args['username'],
+    		# TODO: Hash passwords
+    		"password": args['password'],
+    		"email": args['email']
+    	})
+
+    	response.raise_for_status()
     	return args
 
 api.add_resource(UserAPI, '/v0/users')
