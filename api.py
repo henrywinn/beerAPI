@@ -6,7 +6,9 @@ from porc import Client
 app = Flask(__name__)
 api = restful.Api(app)
 
-db = Client("9e085038-7a3f-436d-9f30-b9338de315f1")
+DB_API_KEY = open('orchestrateKey.txt','r')
+DB_API_KEY = DB_API_KEY.read()
+db = Client(DB_API_KEY)
 
 # Handler for creating new user
 class UserAPI(restful.Resource):
@@ -22,8 +24,13 @@ class UserAPI(restful.Resource):
 
     def post(self):
     	args = self.reqparse.parse_args()
+        pages = db.search('users','value.email:'+args['email'])
+
+        if len(pages.all()) > 0:
+             return {"message":"Email already in use","code":"email_in_use"}, 400
+
     	# TODO: Check that email is valid. Send email and validate
-    	response = db.put('users', args['email'], {
+    	response = db.put('users', args['username'], {
     		"name": args['username'],
     		# TODO: Hash passwords
     		"password": args['password'],
@@ -31,7 +38,7 @@ class UserAPI(restful.Resource):
     	})
 
     	response.raise_for_status()
-    	return args
+    	return {"sure":True}
 
 api.add_resource(UserAPI, '/v0/users')
 
