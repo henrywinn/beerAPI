@@ -68,7 +68,7 @@ class UserAPI(restful.Resource):
 
         api_key = Keychain.create_user_key(args['username'])
 
-    	return {"username":args['username'],"api_key":api_key}
+    	return {"username":args['username'],"api_key":api_key}, 201
 
 api.add_resource(UserAPI, '/v0/users')
 
