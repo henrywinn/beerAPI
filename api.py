@@ -2,6 +2,7 @@ from flask import Flask
 from flask.ext import restful
 from flask.ext.restful import reqparse
 from porc import Client
+import hashlib, uuid
 
 app = Flask(__name__)
 api = restful.Api(app)
@@ -38,10 +39,12 @@ class UserAPI(restful.Resource):
             pass
 
     	# TODO: Check that email is valid. Send email and validate
-    	response = db.put('users', args['username'], {
+        salt = uuid.uuid4().hex
+        hashed_password = hashlib.sha512(salt + args['password']).hexdigest()
+        response = db.put('users', args['username'], {
     		"name": args['username'],
-    		# TODO: Hash passwords
-    		"password": args['password'],
+    		"password": hashed_password,
+            "salt": salt,
     		"email": args['email']
     	})
 
