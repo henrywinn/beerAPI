@@ -17,12 +17,17 @@ class Keychain:
         key = str(uuid.uuid4())
         response = db.put('APIkeys',key,{
             "key": key,
-            "user": username,
+            "username": username,
             "type": "user"
         })
         response.raise_for_status()
         
         return key
+
+    def get_user_api_key(username):
+        pages = db.search('APIkeys',username)
+        keys = pages.all()
+        return keys[0]
 
 # Handler for creating new user
 class UserAPI(restful.Resource):
