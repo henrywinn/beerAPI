@@ -29,6 +29,14 @@ class UserAPI(restful.Resource):
         if len(pages.all()) > 0:
              return {"message":"Email already in use","code":"email_in_use"}, 400
 
+        user = db.get('users', args['username'])
+        try:
+            #try getting a user with that username. If there is no exception, username exists
+            user.raise_for_status()
+            return {"message":"Username already in use","code":"username_in_use"}, 400
+        except Exception, e:
+            pass
+
     	# TODO: Check that email is valid. Send email and validate
     	response = db.put('users', args['username'], {
     		"name": args['username'],
