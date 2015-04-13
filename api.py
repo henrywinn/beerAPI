@@ -11,6 +11,19 @@ DB_API_KEY = open('orchestrateKey.txt','r')
 DB_API_KEY = DB_API_KEY.read()
 db = Client(DB_API_KEY)
 
+class Keychain:
+    @staticmethod
+    def create_user_key(username):
+        key = str(uuid.uuid4())
+        response = db.put('APIkeys',key,{
+            "key": key,
+            "user": username,
+            "type": "user"
+        })
+        response.raise_for_status()
+        
+        return key
+
 # Handler for creating new user
 class UserAPI(restful.Resource):
     def __init__(self):
@@ -48,8 +61,14 @@ class UserAPI(restful.Resource):
     		"email": args['email']
     	})
 
-    	response.raise_for_status()
-    	return {"sure":True}
+    	try:
+            response.raise_for_status()
+        except Exception, e:
+            return {"message":"Trouble adding user to database","code":"db_problem"}, 500
+
+        api_key = Keychain.create_user_key(args['username'])
+
+    	return {"username":args['username'],"api_key":api_key}
 
 api.add_resource(UserAPI, '/v0/users')
 
