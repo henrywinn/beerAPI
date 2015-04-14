@@ -3,7 +3,8 @@ from flask.ext import restful
 from flask.ext.restful import reqparse
 from flask.ext.httpauth import HTTPBasicAuth
 from porc import Client
-import hashlib, uuid
+import hashlib, uuid, iso8601, pytz
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 api = restful.Api(app)
@@ -11,18 +12,44 @@ auth = HTTPBasicAuth()
 
 @auth.verify_password
 def verify_password(username,password):
-    user = db.get('users', username)
-    user.raise_for_status()
-    
-    if user['salt'] != None:
-        hashed_password = hashlib.sha512(user['salt'] + password).hexdigest()    
-        return hashed_password == user['password']
+    # This logic is only run when api key is being recalled 
+    # through /tokens (see: GetToken.get())
+    if password != '':
+        user = db.get('users', username)
+        user.raise_for_status()
+        
+        if user['salt'] != None:
+            hashed_password = hashlib.sha512(user['salt'] + password).hexdigest()    
+            return hashed_password == user['password']
+        else:
+            return False
+    # In every instance of basic auth, besides aforementioned,
+    # an authtoken will be passed as the username. Check to 
+    # make sure that provided token is valid
     else:
-        return False
+        print 'No password provided'
+        token = db.get('APIkeys', username)
+        try:
+            token.raise_for_status()
+            pass
+        except Exception, e:
+            print 'API key not found in db'
+            return False
+        
+        utc=pytz.UTC
+        expiration = iso8601.parse_date(token['expires'])
+        now = utc.localize(datetime.now())
+        if expiration > now:
+            return True
+        else:
+            print 'expiration failed'
+            return False
+
 
 @auth.error_handler
 def unauthorized():
-    return make_response(jsonify({'message': 'Unauthorized access','code': 'unauthorized_access'}), 403)
+    #TODO describe the issue better (invalid token, etc)
+    return make_response(jsonify({'message': 'Unauthorized access','code': 'unauthorized_access'}), 401)
 
 DB_API_KEY = open('orchestrateKey.txt','r')
 DB_API_KEY = DB_API_KEY.read()
@@ -30,22 +57,27 @@ db = Client(DB_API_KEY)
 
 class Keychain:
     @staticmethod
-    def create_user_key(username):
+    def create_user_key(username, expire_in=timedelta(days=7)):
+        expiration = datetime.now() + expire_in
         key = str(uuid.uuid4())
         response = db.put('APIkeys',key,{
             "key": key,
             "username": username,
-            "type": "user"
+            "type": "user",
+            "expires": expiration.isoformat()
         })
         response.raise_for_status()
         
-        return key
+        return (key, expiration.isoformat())
 
     @staticmethod
     def get_user_api_key(username):
         pages = db.search('APIkeys',username)
         keys = pages.all()
-        return keys[0]['value']['key']
+        #TODO access these values in a better way
+        return (keys[0]['value']['key'], keys[0]['value']['expires'])
+
+
 
 # Handler for creating new user
 class UserAPI(restful.Resource):
@@ -68,7 +100,9 @@ class UserAPI(restful.Resource):
 
         user = db.get('users', args['username'])
         try:
-            #try getting a user with that username. If there is no exception, username exists
+            # Try getting a user with that username. 
+            # Exception == no user with that username exists
+            # so if there is no exception return 400
             user.raise_for_status()
             return {"message":"Username already in use","code":"username_in_use"}, 400
         except Exception, e:
@@ -89,15 +123,16 @@ class UserAPI(restful.Resource):
         except Exception, e:
             return {"message":"Trouble adding user to database","code":"db_problem"}, 500
 
-        api_key = Keychain.create_user_key(args['username'])
+        api_key,expiration = Keychain.create_user_key(args['username'])
 
-    	return {"username":args['username'],"api_key":api_key}, 201
+    	return {"username":args['username'],"api_key":api_key,"expires":expiration}, 201
 
+# Used when getting a user api token
 class GetToken(restful.Resource):
     decorators = [auth.login_required]
     def get(self):
-        auth_token = Keychain.get_user_api_key(auth.username())
-        return {"username":auth.username(),"api_key":auth_token}
+        api_key,expiration = Keychain.get_user_api_key(auth.username())
+        return {"username":auth.username(),"api_key":api_key,"expires":expiration}
 
 
 api.add_resource(UserAPI, '/v0/users')
