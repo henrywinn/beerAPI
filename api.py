@@ -1,11 +1,28 @@
-from flask import Flask
+from flask import Flask, jsonify, abort, make_response
 from flask.ext import restful
 from flask.ext.restful import reqparse
+from flask.ext.httpauth import HTTPBasicAuth
 from porc import Client
 import hashlib, uuid
 
 app = Flask(__name__)
 api = restful.Api(app)
+auth = HTTPBasicAuth()
+
+@auth.verify_password
+def verify_password(username,password):
+    user = db.get('users', username)
+    user.raise_for_status()
+    
+    if user['salt'] != None:
+        hashed_password = hashlib.sha512(user['salt'] + password).hexdigest()    
+        return hashed_password == user['password']
+    else:
+        return False
+
+@auth.error_handler
+def unauthorized():
+    return make_response(jsonify({'message': 'Unauthorized access','code': 'unauthorized_access'}), 403)
 
 DB_API_KEY = open('orchestrateKey.txt','r')
 DB_API_KEY = DB_API_KEY.read()
@@ -24,10 +41,11 @@ class Keychain:
         
         return key
 
+    @staticmethod
     def get_user_api_key(username):
         pages = db.search('APIkeys',username)
         keys = pages.all()
-        return keys[0]
+        return keys[0]['value']['key']
 
 # Handler for creating new user
 class UserAPI(restful.Resource):
@@ -75,7 +93,15 @@ class UserAPI(restful.Resource):
 
     	return {"username":args['username'],"api_key":api_key}, 201
 
+class GetToken(restful.Resource):
+    decorators = [auth.login_required]
+    def get(self):
+        auth_token = Keychain.get_user_api_key(auth.username())
+        return {"username":auth.username(),"api_key":auth_token}
+
+
 api.add_resource(UserAPI, '/v0/users')
+api.add_resource(GetToken, '/v0/tokens')
 
 if __name__ == '__main__':
     app.run(debug=True)
