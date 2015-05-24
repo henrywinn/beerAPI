@@ -1,0 +1,13 @@
+#!/bin/bash
+
+#######################################
+# This script should be run to install all
+# system dependencies for running the api
+#######################################
+
+
+cd /tmp
+wget https://bootstrap.pypa.io/get-pip.py		# install pip
+sudo python get-pip.py
+
+sudo pip porc						# install porc as the Orchestrate.io Interface
