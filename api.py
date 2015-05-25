@@ -60,7 +60,7 @@ class Keychain:
     def create_user_key(username, expire_in=timedelta(days=7)):
         expiration = datetime.now() + expire_in
         key = str(uuid.uuid4())
-        while db.search('APIkeys', 'key="'+key+'"') is not []:      # test that key is unique,
+        while len(db.search('APIkeys', 'key:"'+key+'"')) > 0:       # test that key is unique,
             key = str(uuid.uuid4())                                 # replace if it is
         response = db.put('APIkeys',key,{
             "key": key,
