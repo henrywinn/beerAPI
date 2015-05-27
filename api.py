@@ -27,23 +27,7 @@ def verify_password(username,password):
     # an authtoken will be passed as the username. Check to 
     # make sure that provided token is valid
     else:
-        print 'No password provided'
-        token = db.get('APIkeys', username)
-        try:
-            token.raise_for_status()
-            pass
-        except Exception, e:
-            print 'API key not found in db'
-            return False
-        
-        utc=pytz.UTC
-        expiration = iso8601.parse_date(token['expires'])
-        now = utc.localize(datetime.now())
-        if expiration > now:
-            return True
-        else:
-            print 'expiration failed'
-            return False
+        return Keychain.validate_api_key(username)
 
 
 @auth.error_handler
@@ -77,6 +61,23 @@ class Keychain:
         #TODO access these values in a better way
         return (keys[0]['value']['key'], keys[0]['value']['expires'])
 
+    #return True if valid, False if not
+    @staticmethod
+    def validate_api_key(key):
+        result = db.get('APIkeys', key)
+        try:
+            result.raise_for_status()
+            pass
+        except Exception, e:
+            return False
+        
+        utc=pytz.UTC
+        expiration = iso8601.parse_date(result['expires'])
+        now = utc.localize(datetime.now())
+        if expiration > now:
+            return True
+        else:
+            return False
 
 
 # Handler for creating new user
@@ -134,9 +135,35 @@ class GetToken(restful.Resource):
         api_key,expiration = Keychain.get_user_api_key(auth.username())
         return {"username":auth.username(),"api_key":api_key,"expires":expiration}
 
+class AddBeer(restful.Resource):
+    decorators = [auth.login_required]
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+        self.reqparse.add_argument('name', type = str, required = True,
+            help = 'No name provided')
+        super(AddBeer, self).__init__()
+    
+    def post(self):
+        args = self.reqparse.parse_args()
+        #TODO verify that beer name isn't taken
+        new_beer = {"name":args['name']}
+        if 'abv' in args:
+            new_beer['abv'] = args['abv']
+        if 'ibu' in args:
+            new_beer['ibu'] = args['ibu']
+        if 'style' in args:
+            new_beer['style'] = args['style']
+        if 'description' in args:
+            new_beer['description'] = args['description']
+        if 'brewery' in args:
+            new_beer['brewery'] = args['brewery']
+        response = db.put('beers','hell',new_beer)
+        print response
+        return new_beer
 
 api.add_resource(UserAPI, '/v0/users')
 api.add_resource(GetToken, '/v0/tokens')
+api.add_resource(AddBeer, '/v0/beers')
 
 if __name__ == '__main__':
     app.run(debug=True)
