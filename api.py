@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, abort, make_response
+from flask import Flask, jsonify, abort, make_response, request
 from flask.ext import restful
 from flask.ext.restful import reqparse
 from flask.ext.httpauth import HTTPBasicAuth
@@ -15,6 +15,7 @@ def verify_password(username,password):
     # This logic is only run when api key is being recalled 
     # through /tokens (see: GetToken.get())
     if password != '':
+        if request.path != '/v0/tokens': return False
         user = db.get('users', username)
         user.raise_for_status()
         
@@ -44,7 +45,7 @@ class Keychain:
     def create_user_key(username, expire_in=timedelta(days=7)):
         expiration = datetime.now() + expire_in
         key = str(uuid.uuid4())
-        while len(db.search('APIkeys', 'key:"'+key+'"')) > 0:       # test that key is unique,
+        while len(db.search('APIkeys', 'key:"'+key+'"').all()) > 0:       # test that key is unique,
             key = str(uuid.uuid4())                                 # replace if it is
         response = db.put('APIkeys',key,{
             "key": key,
@@ -96,9 +97,8 @@ class UserAPI(restful.Resource):
 
     def post(self):
     	args = self.reqparse.parse_args()
-        pages = db.search('users','value.email:'+args['email'])
 
-        if len(pages.all()) > 0:
+        if len(db.search('users','value.email:'+args['email']).all()) > 0:
              return {"message":"Email already in use","code":"email_in_use"}, 400
 
         user = db.get('users', args['username'])
@@ -143,12 +143,22 @@ class AddBeer(restful.Resource):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type = str, required = True,
             help = 'No name provided')
+        self.reqparse.add_argument('abv', type = float, required = False,)
+        self.reqparse.add_argument('ibu', type = int, required = False,)
+        self.reqparse.add_argument('style', type = str, required = False,)
+        self.reqparse.add_argument('description', type = str, required = False,)
+        self.reqparse.add_argument('brewery', type = str, required = False,)
         super(AddBeer, self).__init__()
     
     def post(self):
         args = self.reqparse.parse_args()
-        #TODO verify that beer name isn't taken
-        new_beer = {"name":args['name']}
+        
+        unique_id = str(uuid.uuid4())
+        while len(db.search('APIkeys', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
+            unique_id = str(uuid.uuid4())                                 # replace if it is
+        
+        new_beer = {"unique_id":unique_id}
+        new_beer['name'] = args['name']
         if 'abv' in args:
             new_beer['abv'] = args['abv']
         if 'ibu' in args:
@@ -159,8 +169,7 @@ class AddBeer(restful.Resource):
             new_beer['description'] = args['description']
         if 'brewery' in args:
             new_beer['brewery'] = args['brewery']
-        response = db.put('beers','hell',new_beer)
-        print response
+        response = db.put('beers',unique_id,new_beer)
         return new_beer
 
 api.add_resource(UserAPI, '/v0/users')
