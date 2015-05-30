@@ -155,7 +155,7 @@ class AddBeer(restful.Resource):
         
         unique_id = str(uuid.uuid4())
         while len(db.search('APIkeys', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
-            unique_id = str(uuid.uuid4())                                 # replace if it is
+            unique_id = str(uuid.uuid4())                                            # replace if it is
         
         new_beer = {"unique_id":unique_id}
         new_beer['name'] = args['name']
@@ -171,6 +171,11 @@ class AddBeer(restful.Resource):
             new_beer['brewery'] = args['brewery']
         response = db.put('beers',unique_id,new_beer)
         return new_beer
+
+class GetBeer(restful.Resource):
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+
 
 api.add_resource(UserAPI, '/v0/users')
 api.add_resource(GetToken, '/v0/tokens')
