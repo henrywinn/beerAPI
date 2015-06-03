@@ -12,20 +12,20 @@ auth = HTTPBasicAuth()
 
 @auth.verify_password
 def verify_password(username,password):
-    # This logic is only run when api key is being recalled 
+    # This logic is only run when api key is being recalled
     # through /tokens (see: GetToken.get())
     if password != '':
         if request.path != '/v0/tokens': return False
         user = db.get('users', username)
         user.raise_for_status()
-        
+
         if user['salt'] != None:
-            hashed_password = hashlib.sha512(user['salt'] + password).hexdigest()    
+            hashed_password = hashlib.sha512(user['salt'] + password).hexdigest()
             return hashed_password == user['password']
         else:
             return False
     # In every instance of basic auth, besides aforementioned,
-    # an authtoken will be passed as the username. Check to 
+    # an authtoken will be passed as the username. Check to
     # make sure that provided token is valid
     else:
         return Keychain.validate_api_key(username)
@@ -54,7 +54,7 @@ class Keychain:
             "expires": expiration.isoformat()
         })
         response.raise_for_status()
-        
+
         return (key, expiration.isoformat())
 
     @staticmethod
@@ -73,7 +73,7 @@ class Keychain:
             pass
         except Exception, e:
             return False
-        
+
         utc=pytz.UTC
         expiration = iso8601.parse_date(result['expires'])
         now = utc.localize(datetime.now())
@@ -103,7 +103,7 @@ class UserAPI(restful.Resource):
 
         user = db.get('users', args['username'])
         try:
-            # Try getting a user with that username. 
+            # Try getting a user with that username.
             # Exception == no user with that username exists
             # so if there is no exception return 400
             user.raise_for_status()
@@ -137,8 +137,7 @@ class GetToken(restful.Resource):
         api_key,expiration = Keychain.get_user_api_key(auth.username())
         return {"username":auth.username(),"api_key":api_key,"expires":expiration}
 
-class AddBeer(restful.Resource):
-    decorators = [auth.login_required]
+class Beer(restful.Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type = str, required = True,
@@ -148,15 +147,21 @@ class AddBeer(restful.Resource):
         self.reqparse.add_argument('style', type = str, required = False,)
         self.reqparse.add_argument('description', type = str, required = False,)
         self.reqparse.add_argument('brewery', type = str, required = False,)
-        super(AddBeer, self).__init__()
-    
+        super(Beer, self).__init__()
+
+
+    def get(self):
+        #TODO implement beer retrieval
+        return {'message': 'beer'}
+
     def post(self):
+        decorators = [auth.login_required]
         args = self.reqparse.parse_args()
-        
+
         unique_id = str(uuid.uuid4())
         while len(db.search('APIkeys', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
             unique_id = str(uuid.uuid4())                                            # replace if it is
-        
+
         new_beer = {"unique_id":unique_id}
         new_beer['name'] = args['name']
         if 'abv' in args:
@@ -172,14 +177,10 @@ class AddBeer(restful.Resource):
         response = db.put('beers',unique_id,new_beer)
         return new_beer
 
-class GetBeer(restful.Resource):
-    def __init__(self):
-        self.reqparse = reqparse.RequestParser()
-
 
 api.add_resource(UserAPI, '/v0/users')
 api.add_resource(GetToken, '/v0/tokens')
-api.add_resource(AddBeer, '/v0/beers')
+api.add_resource(Beer, '/v0/beers')
 
 if __name__ == '__main__':
     app.run(debug=True)
