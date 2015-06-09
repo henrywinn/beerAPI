@@ -67,7 +67,7 @@ class Keychain:
     #return True if valid, False if not
     @staticmethod
     def validate_api_key(key):
-        result = db.get('APIkeys', key)
+        result = db.get('APIkeys', 'username:"'+key+'"')
         try:
             result.raise_for_status()
             pass
