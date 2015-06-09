@@ -154,7 +154,7 @@ class AddBeer(restful.Resource):
         args = self.reqparse.parse_args()
         
         unique_id = str(uuid.uuid4())
-        while len(db.search('APIkeys', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
+        while len(db.search('beers', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
             unique_id = str(uuid.uuid4())                                 # replace if it is
         
         new_beer = {"unique_id":unique_id}
@@ -172,9 +172,42 @@ class AddBeer(restful.Resource):
         response = db.put('beers',unique_id,new_beer)
         return new_beer
 
+class AddBrewery(restful.Resource):
+    decorators = [auth.login_required]
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+        self.reqparse.add_argument('name', type = str, required = True,
+            help = 'No name provided')
+        self.reqparse.add_argument('city', type = float, required = False,)
+        self.reqparse.add_argument('state', type = float, required = False,)
+        self.reqparse.add_argument('country', type = float, required = False,)
+        self.reqparse.add_argument('founded', type = int, required = False,)
+        super(AddBrewery, self).__init__()
+    
+    def post(self):
+        args = self.reqparse.parse_args()
+        
+        unique_id = str(uuid.uuid4())
+        while len(db.search('breweries', '@path.key:"'+unique_id+'"').all()) > 0:       # test that key is unique,
+            unique_id = str(uuid.uuid4())                                 # replace if it is
+        
+        new_brewery = {"unique_id":unique_id}
+        new_brewery['name'] = args['name']
+        if 'city' in args:
+            new_brewery['city'] = args['city']
+        if 'state' in args:
+            new_brewery['state'] = args['state']
+        if 'country' in args:
+            new_brewery['country'] = args['country']
+        if 'founded' in args:
+            new_brewery['founded'] = args['founded']
+        response = db.put('breweries',unique_id,new_brewery)
+        return new_brewery
+
 api.add_resource(UserAPI, '/v0/users')
 api.add_resource(GetToken, '/v0/tokens')
 api.add_resource(AddBeer, '/v0/beers')
+api.add_resource(AddBrewery, '/v0/breweries')
 
 if __name__ == '__main__':
     app.run(debug=True)
