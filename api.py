@@ -70,7 +70,7 @@ class Keychain:
     #return True if valid, False if not
     @staticmethod
     def validate_api_key(key):
-        result = db.get('APIkeys', 'username:"'+key+'"')
+        result = db.get('APIkeys', key)
         try:
             result.raise_for_status()
             pass
@@ -185,9 +185,9 @@ class AddBrewery(restful.Resource):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type = str, required = True,
             help = 'No name provided')
-        self.reqparse.add_argument('city', type = float, required = False,)
-        self.reqparse.add_argument('state', type = float, required = False,)
-        self.reqparse.add_argument('country', type = float, required = False,)
+        self.reqparse.add_argument('city', type = str, required = False,)
+        self.reqparse.add_argument('state', type = str, required = False,)
+        self.reqparse.add_argument('country', type = str, required = False,)
         self.reqparse.add_argument('founded', type = int, required = False,)
         super(AddBrewery, self).__init__()
     
