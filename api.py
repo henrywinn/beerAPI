@@ -59,10 +59,13 @@ class Keychain:
 
     @staticmethod
     def get_user_api_key(username):
-        pages = db.search('APIkeys',username)
+        pages = db.search('APIkeys',username,sort='value.expires:desc')
         keys = pages.all()
         #TODO access these values in a better way
-        return (keys[0]['value']['key'], keys[0]['value']['expires'])
+        if Keychain.has_expired(keys[0]['value']['expires']):
+            return Keychain.create_user_key(username)
+        else:
+            return (keys[0]['value']['key'], keys[0]['value']['expires'])
 
     #return True if valid, False if not
     @staticmethod
@@ -74,10 +77,14 @@ class Keychain:
         except Exception, e:
             return False
         
+        return not Keychain.has_expired(result['expires'])
+
+    @staticmethod
+    def has_expired(timestamp):
         utc=pytz.UTC
-        expiration = iso8601.parse_date(result['expires'])
+        expiration = iso8601.parse_date(timestamp)
         now = utc.localize(datetime.now())
-        if expiration > now:
+        if now > expiration:
             return True
         else:
             return False
